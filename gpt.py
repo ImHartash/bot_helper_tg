@@ -6,21 +6,24 @@ from transformers import AutoTokenizer # Токенизация
 
 class GPT_API:
     # Метод иницилизации
-    def __init__(self, api_url: str, model: str, bot_role: str, role_usage: str, max_tokens_bot: int,) -> None:
+    def __init__(self, api_url: str, model: str, bot_role: str, max_tokens_bot: int,) -> None:
         # Дата
         dt = datetime.datetime.now()
         
         # Токенизация
-        self.tokenizator = AutoTokenizer.from_pretrained(model)
+        self.tokenizator = None
+        if model != "-":
+            self.tokenizator = AutoTokenizer.from_pretrained(model)
         
         # Основные настройки
         self.url = api_url
         self.bot_role = bot_role
-        self.bot_role_usage = role_usage
         self.max_tokens_bot = max_tokens_bot
         
         # Настройки логов
-        self.log_file_name = f"logs/{dt.month}-{dt.year}-logs.log"
+        correct_data = self.__correct_data(dt.month, dt.year)
+        
+        self.log_file_name = f"logs/{correct_data[0]}-{correct_data[1]}-logs.log"
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
@@ -43,7 +46,7 @@ class GPT_API:
                 headers = {"Content-Type": "application/json"},
                 json = {
                     'messages': [
-                        {"role": "system", "content": self.bot_role_usage.format(self.bot_role)},
+                        {"role": "system", "content": self.bot_role},
                         {"role": "user", "content": prompt}
                     ],
                     'temperature': 1,
@@ -62,10 +65,10 @@ class GPT_API:
             )
             
             # Логгируем
-            self.__set_log(f'{reply.json()['choices'][0]['message']['content']}\nStatus-code: {reply.status_code}')
+            self.set_log(f"{reply.json()['choices'][0]['message']['content']}\nStatus-code: {reply.status_code}")
             
         except Exception as e:
-            print(e)
+            self.set_log(f'{reply.json()}\nStatus-code: {e}')
             return 'error'
         
         # Обработка ошибки GPT
@@ -80,19 +83,33 @@ class GPT_API:
         '''
             Возвращает число токенов в сообщении
         '''
-        return len(self.tokenizator.decode(message))
+        if self.tokenizator != None:
+            return len(self.tokenizator.decode(message))
+        
+        return len(message)
     
     
     # Логгирование
-    def __set_log(self, log: object) -> None:
+    def set_log(self, log: object) -> None:
         '''
             log - текст вставляемый в логи
         '''      
         logging.info(log)
+        
+    # Правильное расположение даты (Только для логгов)
+    def __correct_data(self, month, year) -> list:
+        if month < 10:
+            correct_month = "0" + str(month)
+        else:
+            correct_month = str(month)
+        
+        correct_year = str(year)[2:]
+        
+        return [correct_month, correct_year]
     
     # Отправляет логи
-    def get_logs_file(self) -> str:
+    def get_logs_filename(self) -> str:
         '''
-            Возвращает название файла с логгами
+            Возвращает название файла с логами
         '''
         return self.log_file_name

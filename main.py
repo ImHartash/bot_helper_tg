@@ -13,11 +13,11 @@ gpt = GPT_API(
     config.main['api-url'],
     config.main['model'],
     config.main['bot-role'],
-    config.main['bot-role-usage'],
     config.main['bot-max-tokens']
 )
 
 print("Done!")
+gpt.set_log("Bot started")
 
 # Приветственное сообщение (/start)
 @bot.message_handler(commands=['start'])
@@ -33,8 +33,8 @@ def debugmode_command(message: telebot.types.Message) -> None:
     if message.from_user.id not in config.testers:
         return
     
-    # Отправка 00-00-00-log.log файла
-    with open(gpt.get_logs_file, '+r') as f:
+    # Отправка 00-00-log.log файла
+    with open(gpt.get_logs_filename(), 'rb') as f:
         bot.send_document(message.chat.id, f)
     
 
