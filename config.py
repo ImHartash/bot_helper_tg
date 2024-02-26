@@ -1,5 +1,5 @@
 main = {
-    "token": "6771542653:AAGJLwrr3AoITcUBFfU7PXeMYfJiIiJwEFY", # Токен бота
+    "token": "Your token", # Токен бота
     "model": "-", # Модель GPT (для токенизации)
     "max-tokens": 256, # Максимальное кол-во токенов в сообщении 
     "bot-max-tokens": 1024, # Максимально генерируемое кол-во токенов GPT

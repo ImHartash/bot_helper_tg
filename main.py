@@ -17,7 +17,7 @@ gpt = GPT_API(
     config.main['bot-max-tokens']
 )
 
-print("Done!")
+print("Bot started!")
 gpt.set_log("Bot started")
 
 # Приветственное сообщение (/start)
@@ -25,6 +25,39 @@ gpt.set_log("Bot started")
 def start_command(message: telebot.types.Message) -> None:
     # Отправка сообщения
     bot.send_message(message.chat.id, messages.welcome)
+    
+    
+# Список команд (/help)
+@bot.message_handler(commands=['help'])
+def help_command(message: telebot.types.Message) -> None:
+    # Отправка сообщения
+    bot.send_message(message.chat.id, messages.help)
+
+
+# Контакты (/contants)
+@bot.message_handler(commands=['contants'])
+def help_command(message: telebot.types.Message) -> None:
+    # Отправка сообщения
+    bot.send_message(message.chat.id, messages.contants)
+    
+    
+# Информация (/info)
+@bot.message_handler(commands=['info'])
+def help_command(message: telebot.types.Message) -> None:
+    # Отправка сообщения
+    bot.send_message(message.chat.id, messages.info.format(
+        model=config.main['model'],
+        max_tokens=config.main['max-tokens'],
+        bot_max_tokens=config.main['bot-max-tokens'],
+        bot_role=config.main['bot-role']
+    ))
+
+
+# Исходный код (/open_source)
+@bot.message_handler(commands=['open_source'])
+def help_command(message: telebot.types.Message) -> None:
+    # Отправка сообщения
+    bot.send_message(message.chat.id, messages.open_source)
 
 
 # Режим отладки бота (/debug)
