@@ -1,5 +1,6 @@
 import telebot # pyTelegramBotAPI
-# from transformers import AutoTokenizer # подсчёт токенов в сообщении
+import filters # фильтры для текста
+import KeyButtons # кнопки под текстовым полем
 from gpt import GPT_API # класс обращения к GPT
 
 # Конфиги для бота
@@ -36,11 +37,31 @@ def debugmode_command(message: telebot.types.Message) -> None:
     # Отправка 00-00-log.log файла
     with open(gpt.get_logs_filename(), 'rb') as f:
         bot.send_document(message.chat.id, f)
+
+
+# Очистка истории
+@bot.message_handler(func=filters.stop_filter)
+def clear_history(message: telebot.types.Message) -> None:
+    # Проверка на последний запрос
+    if not gpt.is_last_answer(message.from_user.id):
+        bot.send_message(message.chat.id, messages.incorrect_stop)
+        return
+    
+    bot.send_message(message.chat.id, messages.correct_stop)
+    gpt.clear_history(message.from_user.id)
     
 
 # Обработчик для остальных сообщений (текстовых)
 @bot.message_handler(content_types=['text'])
 def text_prompt_handler(message: telebot.types.Message) -> None:
+    
+    # Создание клавиатуры
+    markup = KeyButtons.create_keyboard(['Продолжи объяснение', 'Завершить решение'])
+    
+    # Проверка
+    if gpt.is_last_answer(message.from_user.id) and not filters.continue_filter(message):
+        bot.send_message(message.chat.id, messages.incorrect_message)
+        return
     
     # Отправка сообщения готовности
     wait_message: telebot.types.Message = bot.send_message(message.chat.id, messages.waiting)
@@ -52,7 +73,7 @@ def text_prompt_handler(message: telebot.types.Message) -> None:
         return
     
     # Отправка промпта GPT
-    reply = gpt.get_reply_by_prompt(message.text)
+    reply = gpt.get_reply_by_prompt(message.text, message.from_user.id)
     
     # Обработка ошибки
     if len(reply) < 4 or reply == 'error':
@@ -63,7 +84,14 @@ def text_prompt_handler(message: telebot.types.Message) -> None:
         )
         return
     
-    bot.edit_message_text(reply, message.chat.id, wait_message.message_id)
+    # Удаление старого сообщения для отправки нового (надо для клавиатуры, что-бы она была не inline. Она мне не нравиться :3)
+    bot.delete_message(message.chat.id, wait_message.message_id)
+    # Отправка готового сообщения от GPT
+    try:
+        bot.send_message(message.chat.id, reply, reply_markup=markup, parse_mode='Markdown')
+    except telebot.apihelper.ApiException as e:
+        gpt.set_log("Произошла ошибка при обработке: " + e + "\nОтправка сообщения без парсинга...")
+        bot.send_message(message.chat.id, reply, reply_markup=markup)
     
 
 # Запуск бота
