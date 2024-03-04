@@ -3,6 +3,7 @@ import datetime # для логов, узнать время
 import logging # логи для файла
 import user_history # история запросов к GPT
 from transformers import AutoTokenizer # Токенизация
+from db.database import Database
 
 
 class GPT_API:
@@ -15,6 +16,9 @@ class GPT_API:
         self.tokenizator = None
         if model != "-":
             self.tokenizator = AutoTokenizer.from_pretrained(model)
+            
+        # БД
+        self.database = Database()
         
         # Основные настройки
         self.url = api_url
@@ -129,6 +133,20 @@ class GPT_API:
         correct_year = str(year)[2:]
         
         return [correct_month, correct_year]
+    
+    # Установка языка программирования
+    def set_language(self, user_id: int, lang: str) -> None:
+        if not self.database.is_user_register(user_id):
+            self.database.register_user(user_id)
+        
+        self.database.set_user_data('language', lang, user_id)
+    
+    # Установка уровня объяснения
+    def set_level(self, user_id: int, level: str) -> None:
+        if not self.database.is_user_register(user_id):
+            self.database.register_user(user_id)
+        
+        self.database.set_user_data('level', level, user_id)
     
     # Отправляет логи
     def get_logs_filename(self) -> str:

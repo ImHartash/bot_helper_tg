@@ -1,7 +1,8 @@
 import telebot # pyTelegramBotAPI
 import filters # фильтры для текста
 import KeyButtons # кнопки под текстовым полем
-from gpt import GPT_API # класс обращения к GPT
+from GPT_API.gpt import GPT_API # класс обращения к GPT
+import db.database as database # База данных
 
 # Конфиги для бота
 import config # Основной конфиг
@@ -17,8 +18,11 @@ gpt = GPT_API(
     config.main['bot-max-tokens']
 )
 
-print("Bot started!")
-gpt.set_log("Bot started")
+
+# Уведомляем о запуске бота и записываем в логи
+print("Bot is started!")
+gpt.set_log("Bot is started!")
+
 
 # Приветственное сообщение (/start)
 @bot.message_handler(commands=['start'])
@@ -70,6 +74,12 @@ def debugmode_command(message: telebot.types.Message) -> None:
     # Отправка 00-00-log.log файла
     with open(gpt.get_logs_filename(), 'rb') as f:
         bot.send_document(message.chat.id, f)
+        
+
+# Выбор языка и сложности (/choice)
+@bot.message_handler(commands=['choice'])
+def choice_command(message: telebot.types.Message) -> None:
+    ...
 
 
 # Очистка истории
