@@ -1,7 +1,6 @@
 import requests # парсинг ответов GPT
 import datetime # для логов, узнать время
-import logging # логи для файла
-import user_history # история запросов к GPT
+import logging # логи для файла # история запросов к GPT
 from transformers import AutoTokenizer # Токенизация
 from db.database import Database
 
@@ -26,7 +25,6 @@ class GPT_API:
         self.max_tokens_bot = max_tokens_bot
         
         # Иницилизация историй
-        self.user_history = user_history.UserHistory()
         self.assistant_data = "Решим задачу по шагам: "
         
         # Настройки логов
@@ -55,9 +53,10 @@ class GPT_API:
                 headers = {"Content-Type": "application/json"},
                 json = {
                     'messages': [
-                        {"role": "system", "content": self.bot_role},
+                        {"role": "system", "content": self.bot_role.format(self.database.get_user_data('language', user_id), 
+                                                                           self.database.get_user_data('level', user_id))},
                         {"role": "user", "content": prompt},
-                        {"role": "assistant", "content": self.assistant_data + self.user_history.get_last_answer(user_id)}
+                        {"role": "assistant", "content": self.assistant_data + self.database.get_user_data('gpt_history', user_id)}
                     ],
                     'temperature': 1,
                     'max_tokens': self.max_tokens_bot
@@ -68,7 +67,7 @@ class GPT_API:
                 json = {
                     'messages': [
                         {"role": "user", "content": prompt},
-                        {"role": "assistant", "content": self.assistant_data + self.user_history.get_last_answer(user_id)}
+                        {"role": "assistant", "content": self.assistant_data + self.database.get_user_data('gpt_history', user_id)}
                     ],
                     'temperature': 1,
                     'max_tokens': self.max_tokens_bot
@@ -77,10 +76,13 @@ class GPT_API:
             
             # Логгируем
             self.set_log(f"{reply.json()['choices'][0]['message']['content']}\nStatus-code: {reply.status_code}")
+            self.database.set_user_data('user_history', prompt, user_id)
             
             # Записываем последний результат
-            self.user_history.set_last_answer(user_id, reply.json()['choices'][0]['message']['content'])
-            
+            self.database.set_user_data('gpt_history', 
+                                        self.database.get_user_data('gpt_history', user_id) + reply.json()['choices'][0]['message']['content'],
+                                        user_id)
+        
         except Exception as e:
             self.set_log(f'{reply.json()}\nStatus-code: {e}')
             return 'error'
@@ -97,12 +99,13 @@ class GPT_API:
         '''
             Очищает историю запросов.
         '''
-        self.user_history.clear_last_answer(user_id)
+        self.database.set_user_data('gpt_history', '', user_id)
+        self.database.set_user_data('user_history', '', user_id)
     
     
     # Для проверки на последний запрос
     def is_last_answer(self, user_id: int) -> bool:
-        return self.user_history.get_last_answer(user_id) != ""
+        return self.database.get_user_data('gpt_history', user_id)
     
     
     # Подсчет токенв в сообщении

@@ -27,41 +27,98 @@ gpt.set_log("Bot is started!")
 # Приветственное сообщение (/start)
 @bot.message_handler(commands=['start'])
 def start_command(message: telebot.types.Message) -> None:
+    # Регистрация пользователя
+    gpt.database.register_user(message.from_user.id)
     # Отправка сообщения
-    bot.send_message(message.chat.id, messages.welcome)
+    markup = KeyButtons.create_keyboard(['Настроить ответ', 'Текущие настройки'])
+    bot.send_message(message.chat.id, messages.welcome, reply_markup=markup)
+    
+
+# Выбор языка и сложности (/choice)
+@bot.message_handler(func=filters.choice_filter)
+@bot.message_handler(commands=['choice'])
+def choice_command(message: telebot.types.Message) -> None:
+    # Регистрация пользователя
+    gpt.database.register_user(message.from_user.id)
+    # Предложение выбора языка прогарммирования
+    markup = KeyButtons.create_keyboard(config.CHOICE_LANGS)
+    bot.send_message(message.chat.id, messages.choice_lang, reply_markup=markup)
+    bot.register_next_step_handler(message, choice_lang)
+
+def choice_lang(message: telebot.types.Message) -> None:
+    if message.text not in config.CHOICE_LANGS:
+        markup = KeyButtons.create_keyboard(config.CHOICE_LANGS)
+        bot.send_message(message.chat.id, messages.choice_lang, reply_markup=markup)
+        bot.register_next_step_handler(message, choice_lang)
+        return
+    
+    gpt.database.set_user_data('language', message.text, message.from_user.id)
+    
+    markup = KeyButtons.create_keyboard(config.DIFFICULTIES)
+    bot.send_message(message.chat.id, messages.choice_level, reply_markup=markup)
+    
+    bot.register_next_step_handler(message, choice_level)
+
+def choice_level(message: telebot.types.Message) -> None:
+    if message.text not in config.DIFFICULTIES:
+        markup = KeyButtons.create_keyboard(config.DIFFICULTIES)
+        bot.send_message(message.chat.id, messages.choice_level, reply_markup=markup)
+        bot.register_next_step_handler(message, choice_level)
+        return
+    
+    gpt.database.set_user_data('level', message.text, message.from_user.id)
+    bot.send_message(message.chat.id, messages.choice_done)
+
+
+@bot.message_handler(func=filters.settings_filter)
+@bot.message_handler(commands=['settings'])
+def settings_command(message: telebot.types.Message) -> None:
+    user_language = gpt.database.get_user_data('language', message.from_user.id)
+    user_level = gpt.database.get_user_data('level', message.from_user.id)
+    
+    if user_language == '':
+        user_language = 'Нету'
+    if user_level == '':
+        user_level = 'Нету'
+    
+    bot.send_message(message.chat.id, messages.settings.format(user_language, user_level))
     
     
 # Список команд (/help)
 @bot.message_handler(commands=['help'])
 def help_command(message: telebot.types.Message) -> None:
     # Отправка сообщения
-    bot.send_message(message.chat.id, messages.help)
+    markup = KeyButtons.create_keyboard(['Настроить ответ', 'Текущие настройки'])
+    bot.send_message(message.chat.id, messages.help, reply_markup=markup)
 
 
 # Контакты (/contants)
 @bot.message_handler(commands=['contants'])
 def help_command(message: telebot.types.Message) -> None:
     # Отправка сообщения
-    bot.send_message(message.chat.id, messages.contants)
+    markup = KeyButtons.create_keyboard(['Настроить ответ', 'Текущие настройки'])
+    bot.send_message(message.chat.id, messages.contants, reply_markup=markup)
     
     
 # Информация (/info)
 @bot.message_handler(commands=['info'])
 def help_command(message: telebot.types.Message) -> None:
     # Отправка сообщения
+    markup = KeyButtons.create_keyboard(['Настроить ответ', 'Текущие настройки'])
     bot.send_message(message.chat.id, messages.info.format(
         model=config.main['model'],
         max_tokens=config.main['max-tokens'],
         bot_max_tokens=config.main['bot-max-tokens'],
         bot_role=config.main['bot-role']
-    ))
+    ), reply_markup=markup)
 
 
 # Исходный код (/open_source)
 @bot.message_handler(commands=['open_source'])
 def help_command(message: telebot.types.Message) -> None:
+    markup = KeyButtons.create_keyboard(['Настроить ответ', 'Текущие настройки'])
     # Отправка сообщения
-    bot.send_message(message.chat.id, messages.open_source)
+    bot.send_message(message.chat.id, messages.open_source, reply_markup=markup)
 
 
 # Режим отладки бота (/debug)
@@ -74,29 +131,30 @@ def debugmode_command(message: telebot.types.Message) -> None:
     # Отправка 00-00-log.log файла
     with open(gpt.get_logs_filename(), 'rb') as f:
         bot.send_document(message.chat.id, f)
-        
-
-# Выбор языка и сложности (/choice)
-@bot.message_handler(commands=['choice'])
-def choice_command(message: telebot.types.Message) -> None:
-    ...
 
 
 # Очистка истории
 @bot.message_handler(func=filters.stop_filter)
 def clear_history(message: telebot.types.Message) -> None:
+    markup = KeyButtons.create_keyboard(['Настроить ответ', 'Текущие настройки'])
     # Проверка на последний запрос
     if not gpt.is_last_answer(message.from_user.id):
-        bot.send_message(message.chat.id, messages.incorrect_stop)
+        bot.send_message(message.chat.id, messages.incorrect_stop, reply_markup=markup)
         return
     
-    bot.send_message(message.chat.id, messages.correct_stop)
+    bot.send_message(message.chat.id, messages.correct_stop, reply_markup=markup)
     gpt.clear_history(message.from_user.id)
     
 
 # Обработчик для остальных сообщений (текстовых)
 @bot.message_handler(content_types=['text'])
 def text_prompt_handler(message: telebot.types.Message) -> None:
+    
+    gpt.database.register_user(message.from_user.id)
+    
+    if gpt.database.get_user_data('language', message.from_user.id) == "" or gpt.database.get_user_data('level', message.from_user.id) == "":
+        bot.send_message(message.chat.id, messages.not_choiced)
+        return
     
     # Создание клавиатуры
     markup = KeyButtons.create_keyboard(['Продолжи объяснение', 'Завершить решение'])
